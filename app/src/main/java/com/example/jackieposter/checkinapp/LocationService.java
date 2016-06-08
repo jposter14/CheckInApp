@@ -1,9 +1,12 @@
 package com.example.jackieposter.checkinapp;
 
 import android.app.IntentService;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Intent;
 import android.location.Location;
 import android.os.Bundle;
+import android.support.v7.app.NotificationCompat;
 import android.util.Log;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -11,6 +14,8 @@ import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
+
+import static com.google.android.gms.location.LocationRequest.PRIORITY_HIGH_ACCURACY;
 
 
 /**
@@ -28,7 +33,6 @@ public class LocationService extends IntentService implements GoogleApiClient.Co
 
     @Override
     protected void onHandleIntent(Intent intent) {
-        String dataString = intent.getDataString();
 
         //do work here
         mGoogleApiClient = new GoogleApiClient.Builder(this)
@@ -41,8 +45,9 @@ public class LocationService extends IntentService implements GoogleApiClient.Co
 
         // Create the LocationRequest object
         mLocationRequest = LocationRequest.create()
-                .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
+                .setPriority(PRIORITY_HIGH_ACCURACY)
                 .setInterval(900000); // 1 second, in milliseconds
+
     }
 
     @Override
@@ -52,12 +57,37 @@ public class LocationService extends IntentService implements GoogleApiClient.Co
         Location location = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
 
         LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
+
         handleNewLocation(location);
 
     }
 
     private void handleNewLocation(Location location) {
         Log.d(TAG, location.toString());
+
+        final Location intrepid = new Location("Intrepid");
+        intrepid.setLatitude(42.367322);
+        intrepid.setLongitude(-71.080141);
+
+        if(location.distanceTo(intrepid) <= 50){
+            Log.d(TAG, "within 50m of Intrepid");
+
+            NotificationCompat.Builder mBuilder = (NotificationCompat.Builder) new NotificationCompat.Builder(this)
+                    .setSmallIcon(R.drawable.notification_icon)
+                    .setContentTitle("Check In App Notification")
+                    .setContentText("Tell your friends at Intrepid you are here!")
+                    .setAutoCancel(true);
+
+            Intent slackIntent = new Intent(this, SlackReceiver.class);
+
+            PendingIntent slackPendingIntent = PendingIntent.getBroadcast(this, 0, slackIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+
+            mBuilder.setContentIntent(slackPendingIntent);
+
+            int mNotificationId = 001;
+            NotificationManager mNotifyMgr = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            mNotifyMgr.notify(mNotificationId, mBuilder.build());
+        }
     }
 
     @Override
